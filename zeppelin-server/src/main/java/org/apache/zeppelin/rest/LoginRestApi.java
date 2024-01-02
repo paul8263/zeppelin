@@ -18,12 +18,9 @@ package org.apache.zeppelin.rest;
 
 import com.google.gson.Gson;
 
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -34,6 +31,8 @@ import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+
+import org.apache.commons.codec.binary.Base64;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.AuthenticationToken;
 import org.apache.shiro.authc.IncorrectCredentialsException;
@@ -193,6 +192,10 @@ public class LoginRestApi {
       currentUser.logout();
     }
     if (!currentUser.isAuthenticated()) {
+      // Use base64 encoded password for Insight HD
+      if (isLdapConfigured()) {
+        password = base64Encode(password);
+      }
 
       UsernamePasswordToken token = new UsernamePasswordToken(userName, password);
 
@@ -205,6 +208,26 @@ public class LoginRestApi {
 
     LOG.warn(response.toString());
     return response.build();
+  }
+
+  private boolean isLdapConfigured() {
+    Collection realmsList = SecurityUtils.getRealmsList();
+    for (Iterator<Realm> iterator = realmsList.iterator(); iterator.hasNext(); ) {
+      Realm realm = iterator.next();
+      String name = realm.getClass().getName();
+      LOG.debug("RealmClass.getName: " + name);
+      if (name.equals("org.apache.zeppelin.realm.LdapRealm") || name.equals("org.apache.zeppelin.realm.LdapGroupRealm")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private String base64Encode(String s) {
+    if (s == null) {
+      return "";
+    }
+    return new String(Base64.encodeBase64(s.getBytes(StandardCharsets.UTF_8)));
   }
 
   @POST
